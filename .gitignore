@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production build output
+dist/
+dist-ssr/
+
+# Environment files and credentials
+.env
+.env.local
+.env.*.local
+*.env
+*.env.*
+*.pem
+*.key
+*.cert
+credentials.json
+
+# Cache and temporary folders
+.cache/
+.vite/
+.eslintcache
+*.tmp
+*.temp
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# Editor and OS system files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
