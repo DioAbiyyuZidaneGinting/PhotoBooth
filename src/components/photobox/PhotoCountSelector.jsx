@@ -1,27 +1,33 @@
 import React from 'react';
-import { Camera, Image, Layers, Sparkles } from 'lucide-react';
+import { Camera, Film, LayoutGrid, ArrowRight } from 'lucide-react';
 
 const PHOTO_COUNT_CONFIGS = [
   {
     count: 3,
     label: '3 FOTO',
-    description: 'Tiga foto dalam satu frame',
-    icon: '📸',
-    gradient: 'gradient-3foto'
+    tag: '★ 3 PHOTOS',
+    description: 'Tiga foto vertikal dalam satu frame strip klasik',
+    icon: Camera,
+    colorScheme: 'red',
+    slots: 3
   },
   {
     count: 4,
     label: '4 FOTO',
-    description: 'Empat foto dalam satu frame',
-    icon: '🎞️',
-    gradient: 'gradient-4foto'
+    tag: '★ 4 PHOTOS',
+    description: 'Empat foto proporsional strip & format grid',
+    icon: Film,
+    colorScheme: 'black',
+    slots: 4
   },
   {
     count: 6,
     label: '6 FOTO',
-    description: 'Enam foto dalam satu frame',
-    icon: '🖼️',
-    gradient: 'gradient-6foto'
+    tag: '★ 6 PHOTOS',
+    description: 'Enam foto kolase penuh memori & momen seru',
+    icon: LayoutGrid,
+    colorScheme: 'yellow',
+    slots: 6
   }
 ];
 
@@ -29,35 +35,65 @@ export default function PhotoCountSelector({ onSelectCount }) {
   return (
     <div className="photo-count-selector-page">
       <div className="photo-count-hero">
-        <div className="hero-icon-ring">
-          <Camera size={36} className="text-pink" />
+        <div className="hero-icon-badge">
+          <Camera size={26} />
         </div>
-        <h2 className="photo-count-title">Berapa Foto?</h2>
+        <span className="photo-count-step-tag">
+          ★ LANGKAH 1 DARI 3 &bull; PILIH JUMLAH FOTO
+        </span>
+        <h2 className="photo-count-title">
+          Berapa <span className="photo-count-title-italic">Foto?</span>
+        </h2>
         <p className="photo-count-subtitle">
-          Pilih jumlah foto untuk sesi fotomu. Setiap pilihan memiliki template frame eksklusif.
+          Pilih jumlah foto untuk sesi fotomu. Setiap pilihan memiliki template frame eksklusif yang siap dicetak.
         </p>
       </div>
 
       <div className="photo-count-grid">
-        {PHOTO_COUNT_CONFIGS.map((cfg) => (
-          <button
-            key={cfg.count}
-            type="button"
-            className={`photo-count-card ${cfg.gradient}`}
-            onClick={() => onSelectCount(cfg.count)}
-            aria-label={`Pilih ${cfg.count} foto`}
-          >
-            <div className="count-card-glow" />
-            <div className="count-card-inner">
-              <span className="count-card-emoji">{cfg.icon}</span>
-              <div className="count-card-number">{cfg.count}</div>
-              <div className="count-card-label">{cfg.label}</div>
-              <div className="count-card-desc">{cfg.description}</div>
-            </div>
-            <div className="count-card-arrow">→</div>
-          </button>
-        ))}
+        {PHOTO_COUNT_CONFIGS.map((cfg) => {
+          const IconComp = cfg.icon;
+          return (
+            <button
+              key={cfg.count}
+              type="button"
+              className={`photo-count-card card-theme-${cfg.colorScheme}`}
+              onClick={() => onSelectCount(cfg.count)}
+              aria-label={`Pilih ${cfg.count} foto`}
+            >
+              {/* Header card: Pill tag + Icon bubble */}
+              <div className="count-card-top-bar">
+                <span className="count-card-pill-tag">{cfg.tag}</span>
+                <span className="count-card-icon-bubble">
+                  <IconComp size={16} />
+                </span>
+              </div>
+
+              {/* Visual Display Box */}
+              <div className="count-card-visual-box">
+                <div className="count-card-big-number">{cfg.count}</div>
+                <div className="count-card-slots-preview" aria-hidden="true">
+                  {Array.from({ length: cfg.slots }).map((_, idx) => (
+                    <span key={idx} className="slot-preview-tile" />
+                  ))}
+                </div>
+              </div>
+
+              {/* Text content */}
+              <div className="count-card-text-body">
+                <h3 className="count-card-title">{cfg.label}</h3>
+                <p className="count-card-desc">{cfg.description}</p>
+              </div>
+
+              {/* Bottom Action Pill */}
+              <div className="count-card-action-pill">
+                <span>Pilih {cfg.count} Foto</span>
+                <ArrowRight size={16} />
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
 }
+

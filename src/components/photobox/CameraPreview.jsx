@@ -1,8 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Camera, CameraOff, RefreshCw, FlipHorizontal, AlertCircle, Sparkles, Video, Aperture } from 'lucide-react';
 import Countdown from './Countdown';
-import { getSlotPoints } from '../../utils/canvasRenderer';
-import { getCssPolygonClip } from '../../utils/perspectiveTransform';
 
 export default function CameraPreview({
   selectedTemplate,
@@ -25,17 +23,8 @@ export default function CameraPreview({
   const [videoDevices, setVideoDevices] = useState([]);
   const streamRef = useRef(null);
 
-  const activeSlot = selectedTemplate?.slots?.[currentSlotIndex] || selectedTemplate?.slots?.[0];
   const maxSlots = selectedTemplate?.slots?.length || 1;
   const totalSlots = photoCount ? Math.min(photoCount, maxSlots) : maxSlots;
-
-  const tplW = selectedTemplate?.width || 1024;
-  const tplH = selectedTemplate?.height || 1536;
-
-  // Active slot 4-corner points
-  const activePoints = activeSlot ? getSlotPoints(activeSlot) : null;
-  const activePolyStr = activePoints ? activePoints.map(p => `${p.x},${p.y}`).join(' ') : '';
-  const activeClipPath = activePoints ? getCssPolygonClip(activePoints, tplW, tplH) : 'none';
 
   // Muat daftar hardware kamera
   const loadDevices = async () => {
@@ -109,6 +98,7 @@ export default function CameraPreview({
     }
   };
 
+
   useEffect(() => {
     startCamera(activeDeviceId);
 
@@ -134,7 +124,7 @@ export default function CameraPreview({
             FOTO <strong>{currentSlotIndex + 1}</strong> / {totalSlots}
           </span>
           <span className="banner-slot-sub">
-            ({activeSlot?.label || `Slot ${currentSlotIndex + 1}`})
+            ({selectedTemplate?.slots?.[currentSlotIndex]?.label || `Slot ${currentSlotIndex + 1}`})
           </span>
         </div>
         <div className="banner-right">
@@ -146,16 +136,17 @@ export default function CameraPreview({
         </div>
       </div>
 
-      {/* Aspect Ratio Box Wrapper (Matches Template Aspect Ratio) */}
+      {/* Aspect Ratio Box Wrapper */}
       <div
         className="aspect-ratio-wrapper"
         style={{
-          aspectRatio: `${tplW} / ${tplH}`,
+          aspectRatio: '4 / 3',
           position: 'relative',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          borderRadius: '0.75rem'
         }}
       >
-        {/* Layer 1: Full Live Video Feed in Background Viewfinder */}
+        {/* Full Live Video Feed — clean camera viewfinder */}
         <video
           ref={videoRef}
           autoPlay
@@ -172,106 +163,6 @@ export default function CameraPreview({
           }}
         />
 
-        {/* Layer 2: Template PNG Frame Overlay with Semi-transparency for guidance */}
-        {selectedTemplate && selectedTemplate.image && (
-          <img
-            src={selectedTemplate.image}
-            alt={selectedTemplate.name}
-            className="camera-template-overlay"
-            crossOrigin="anonymous"
-            style={{
-              position: 'absolute',
-              inset: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'fill',
-              zIndex: 2,
-              pointerEvents: 'none',
-              opacity: 0.88
-            }}
-          />
-        )}
-
-        {/* Layer 3: Highlighted Active Quadrilateral Slot Viewport */}
-        {activePoints && (
-          <div
-            className="camera-active-slot-viewport"
-            style={{
-              position: 'absolute',
-              inset: 0,
-              clipPath: activeClipPath,
-              WebkitClipPath: activeClipPath,
-              zIndex: 3,
-              boxShadow: '0 0 20px rgba(236, 72, 153, 0.6) inset',
-              pointerEvents: 'none'
-            }}
-          >
-            {/* Live Camera Feed explicitly focused inside active slot */}
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                backgroundColor: 'rgba(236, 72, 153, 0.08)'
-              }}
-            />
-          </div>
-        )}
-
-        {/* Layer 4: SVG Quadrilateral Active Outline Guide */}
-        <svg
-          viewBox={`0 0 ${tplW} ${tplH}`}
-          style={{
-            position: 'absolute',
-            inset: 0,
-            width: '100%',
-            height: '100%',
-            zIndex: 4,
-            pointerEvents: 'none'
-          }}
-        >
-          {selectedTemplate?.slots?.map((slot, idx) => {
-            const pts = getSlotPoints(slot);
-            const polyStr = pts.map(p => `${p.x},${p.y}`).join(' ');
-            const isActive = idx === currentSlotIndex;
-
-            return (
-              <g key={`cam-guide-${slot.id || idx}`}>
-                {isActive ? (
-                  <>
-                    <polygon
-                      points={polyStr}
-                      fill="rgba(236, 72, 153, 0.15)"
-                      stroke="#ec4899"
-                      strokeWidth={tplW > 900 ? "6" : "4"}
-                      strokeDasharray="14, 8"
-                      className="active-polygon-dash"
-                    />
-                    {/* Corner Reticle Markers */}
-                    {pts.map((pt, pIdx) => (
-                      <circle
-                        key={`cam-pt-${pIdx}`}
-                        cx={pt.x}
-                        cy={pt.y}
-                        r="6"
-                        fill="#ec4899"
-                        stroke="#ffffff"
-                        strokeWidth="2"
-                      />
-                    ))}
-                  </>
-                ) : (
-                  <polygon
-                    points={polyStr}
-                    fill="none"
-                    stroke="rgba(255, 255, 255, 0.25)"
-                    strokeWidth="2"
-                    strokeDasharray="6, 6"
-                  />
-                )}
-              </g>
-            );
-          })}
-        </svg>
 
         {/* Layer 5: Countdown Display */}
         {isCapturing && (

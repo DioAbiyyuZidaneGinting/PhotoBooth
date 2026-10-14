@@ -409,7 +409,7 @@ export default function App() {
         {/* Navigation Bar */}
         <header className="app-navbar">
           <div className="navbar-container">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div className="navbar-brand-group">
               {/* Back to Home Landing Button */}
               <button
                 type="button"
@@ -418,23 +418,9 @@ export default function App() {
                   setCurrentView('LANDING');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.45rem',
-                  background: 'rgba(255, 255, 255, 0.12)',
-                  border: '1px solid rgba(255, 255, 255, 0.25)',
-                  color: '#FFFFFF',
-                  padding: '0.45rem 0.95rem',
-                  borderRadius: '9999px',
-                  fontSize: '0.85rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
-                }}
                 title="Kembali ke Landing Page"
               >
-                <ArrowLeft size={15} />
+                <ArrowLeft size={16} />
                 <span>Home</span>
               </button>
 
@@ -444,12 +430,11 @@ export default function App() {
                   setCurrentView('LANDING');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                style={{ cursor: 'pointer' }}
                 role="button"
                 tabIndex={0}
               >
                 <div className="brand-icon-box">
-                  <Camera size={22} className="text-pink" />
+                  <Camera size={20} />
                 </div>
                 <div className="brand-text">
                   <span className="brand-title">PHOTOBOX STUDIO</span>
@@ -465,7 +450,7 @@ export default function App() {
                 className={`mode-nav-btn ${appMode === 'LOCAL' ? 'active' : ''}`}
                 onClick={() => { setAppMode('LOCAL'); }}
               >
-                <Camera size={16} />
+                <Camera size={15} />
                 <span>Local Photobox</span>
               </button>
               <button
@@ -473,7 +458,7 @@ export default function App() {
                 className={`mode-nav-btn ${appMode === 'ONLINE' ? 'active' : ''}`}
                 onClick={() => { setAppMode('ONLINE'); }}
               >
-                <Heart size={16} className={appMode === 'ONLINE' ? 'text-pink' : ''} />
+                <Heart size={15} />
                 <span>Couple Online (LDR)</span>
               </button>
             </div>
@@ -485,13 +470,8 @@ export default function App() {
                 className={`btn-editor-open ${debugMode ? 'active' : ''}`}
                 onClick={() => setDebugMode(!debugMode)}
                 title={debugMode ? 'Nonaktifkan Debug Slot' : 'Aktifkan Debug Slot & Corner Points'}
-                style={{
-                  backgroundColor: debugMode ? 'rgba(59, 130, 246, 0.2)' : undefined,
-                  borderColor: debugMode ? '#3b82f6' : undefined,
-                  color: debugMode ? '#60a5fa' : undefined
-                }}
               >
-                <Sparkles size={15} />
+                <Sparkles size={14} />
                 <span className="editor-btn-label">{debugMode ? 'Debug: ON' : 'Debug Slot'}</span>
               </button>
 
@@ -501,7 +481,7 @@ export default function App() {
                 onClick={() => setIsEditorOpen(true)}
                 title="Buka Visual Slot Editor"
               >
-                <Edit3 size={15} />
+                <Edit3 size={14} />
                 <span className="editor-btn-label">Editor Slot</span>
               </button>
 
@@ -511,7 +491,7 @@ export default function App() {
                 onClick={() => setSoundEnabled(!soundEnabled)}
                 title={soundEnabled ? 'Suara Aktif' : 'Suara Dimatikan'}
               >
-                {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+                {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
                 <span className="sound-toggle-label">{soundEnabled ? 'Audio On' : 'Muted'}</span>
               </button>
 

@@ -39,3 +39,12 @@ Thumbs.db
 .vscode/
 *.sublime-project
 *.sublime-workspace
+
+# AI Agents and Skills
+.agents/
+AGENTS.md
+.clinerules/
+.cursor/
+.github/
+.opencode/
+.windsurf/
