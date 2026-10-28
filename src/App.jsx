@@ -92,7 +92,11 @@ export default function App() {
   const [initialRoomCodeFromUrl, setInitialRoomCodeFromUrl] = useState('');
 
   const videoRef = useRef(null);
+  const captureCanvasRef = useRef(null);
   const countdownTimerRef = useRef(null);
+
+  // Background foto yang dipilih dari template/background foto (default: 'design1')
+  const [activeBackgroundId, setActiveBackgroundId] = useState('design1');
 
   // Derived state — slot config dari template yang dipilih
   const slots = selectedTemplate?.slots || [];
@@ -229,8 +233,9 @@ export default function App() {
           sounds.playShutterSound();
         }
 
-        if (videoRef.current) {
-          const snapshot = captureRawVideo(videoRef.current, isMirrored);
+        if (videoRef.current || captureCanvasRef.current) {
+          const captureSource = captureCanvasRef.current || videoRef.current;
+          const snapshot = captureRawVideo(captureSource, isMirrored);
           const activeSlot = slots[currentSlotIndex] || slots[0];
 
           const newPhotos = {
@@ -586,6 +591,7 @@ export default function App() {
                           countdown={currentCountdown}
                           isCapturing={isCapturing}
                           videoRef={videoRef}
+                          captureCanvasRef={captureCanvasRef}
                           isMirrored={isMirrored}
                           setIsMirrored={setIsMirrored}
                           onStartCapture={handleStartCapture}
@@ -593,6 +599,8 @@ export default function App() {
                           setCameraErrorMessage={setCameraErrorMessage}
                           activeDeviceId={activeDeviceId}
                           setActiveDeviceId={setActiveDeviceId}
+                          activeBackgroundId={activeBackgroundId}
+                          setActiveBackgroundId={setActiveBackgroundId}
                           debugMode={debugMode}
                         />
                       </div>

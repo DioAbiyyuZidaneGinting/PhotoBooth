@@ -1,6 +1,32 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { Camera, CameraOff, RefreshCw, FlipHorizontal, AlertCircle, Sparkles, Video, Aperture } from 'lucide-react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { Camera, CameraOff, RefreshCw, FlipHorizontal, AlertCircle, Sparkles, Video, Aperture, Check, Image as ImageIcon } from 'lucide-react';
 import Countdown from './Countdown';
+import { PHOTO_BACKGROUNDS, getBackgroundById } from '../../data/backgrounds';
+import { segmentationManager } from '../../services/selfieSegmentationService';
+
+/**
+ * Menggambar gambar latar dengan cover fit agar tidak distorsi
+ */
+function drawCoverImage(ctx, img, x, y, w, h) {
+  if (!img) return;
+  const imgW = img.naturalWidth || img.width;
+  const imgH = img.naturalHeight || img.height;
+  if (!imgW || !imgH) return;
+
+  const targetAspect = w / h;
+  const imgAspect = imgW / imgH;
+
+  let sx = 0, sy = 0, sw = imgW, sh = imgH;
+  if (imgAspect > targetAspect) {
+    sw = imgH * targetAspect;
+    sx = (imgW - sw) / 2;
+  } else {
+    sh = imgW / targetAspect;
+    sy = (imgH - sh) / 2;
+  }
+
+  ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+}
 
 export default function CameraPreview({
   selectedTemplate,
@@ -11,6 +37,7 @@ export default function CameraPreview({
   countdown,
   isCapturing,
   videoRef,
+  captureCanvasRef,
   isMirrored,
   setIsMirrored,
   onStartCapture,
@@ -18,13 +45,67 @@ export default function CameraPreview({
   setCameraErrorMessage,
   activeDeviceId,
   setActiveDeviceId,
+  activeBackgroundId = 'design1',
+  setActiveBackgroundId = null,
   debugMode = false
 }) {
   const [videoDevices, setVideoDevices] = useState([]);
   const streamRef = useRef(null);
 
+  // Canvas untuk rendering realtime komposit AI
+  const localCanvasRef = useRef(null);
+  const canvasRef = captureCanvasRef || localCanvasRef;
+
+  // Status MediaPipe AI Segmentation
+  const [aiStatus, setAiStatus] = useState('INIT'); // 'INIT' | 'READY' | 'PROCESSING' | 'ERROR'
+  const [aiErrorMessage, setAiErrorMessage] = useState('');
+
+  // Cache gambar background
+  const bgImagesCache = useRef({});
+
   const maxSlots = selectedTemplate?.slots?.length || 1;
   const totalSlots = photoCount ? Math.min(photoCount, maxSlots) : maxSlots;
+
+  // Preload background images
+  useEffect(() => {
+    PHOTO_BACKGROUNDS.forEach((bg) => {
+      if (bg.image && !bgImagesCache.current[bg.id]) {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.src = bg.image;
+        img.onload = () => {
+          bgImagesCache.current[bg.id] = img;
+        };
+      }
+    });
+  }, []);
+
+  // Inisialisasi MediaPipe Selfie Segmentation
+  useEffect(() => {
+    let isMounted = true;
+
+    async function initMediaPipe() {
+      try {
+        setAiStatus('INIT');
+        await segmentationManager.init();
+        if (isMounted) {
+          setAiStatus('READY');
+        }
+      } catch (err) {
+        console.error('Gagal inisialisasi MediaPipe Selfie Segmentation:', err);
+        if (isMounted) {
+          setAiStatus('ERROR');
+          setAiErrorMessage('Gagal memuat AI Segmentation. Menggunakan kamera normal.');
+        }
+      }
+    }
+
+    initMediaPipe();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Muat daftar hardware kamera
   const loadDevices = async () => {
@@ -61,8 +142,8 @@ export default function CameraPreview({
       const constraints = {
         audio: false,
         video: deviceIdToUse
-          ? { deviceId: { exact: deviceIdToUse }, width: { ideal: 1920 }, height: { ideal: 1080 } }
-          : { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1080 } }
+          ? { deviceId: { exact: deviceIdToUse }, width: { ideal: 1280 }, height: { ideal: 720 } }
+          : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }
       };
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -98,7 +179,6 @@ export default function CameraPreview({
     }
   };
 
-
   useEffect(() => {
     startCamera(activeDeviceId);
 
@@ -108,6 +188,92 @@ export default function CameraPreview({
       }
     };
   }, [activeDeviceId]);
+
+  // Loop Render Realtime Komposit: Latar Belakang (Layer 1) + Orang Tersegmentasi (Layer 2)
+  useEffect(() => {
+    let animId = null;
+    let isProcessing = false;
+
+    const renderLoop = async () => {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+
+      if (video && canvas && video.readyState >= 2 && cameraStatus === 'READY') {
+        const vWidth = video.videoWidth || 1280;
+        const vHeight = video.videoHeight || 720;
+
+        if (canvas.width !== vWidth || canvas.height !== vHeight) {
+          canvas.width = vWidth;
+          canvas.height = vHeight;
+        }
+
+        const ctx = canvas.getContext('2d');
+
+        // Jika user memilih background dan MediaPipe aktif
+        const isAiActive = activeBackgroundId !== 'none' && segmentationManager.isReady;
+
+        if (isAiActive && !isProcessing) {
+          isProcessing = true;
+
+          // Pasang handler hasil segmentasi
+          segmentationManager.setOnResults((results) => {
+            if (!ctx) return;
+
+            ctx.save();
+            ctx.clearRect(0, 0, vWidth, vHeight);
+
+            // Terapkan mirror
+            if (isMirrored) {
+              ctx.translate(vWidth, 0);
+              ctx.scale(-1, 1);
+            }
+
+            const currentBgImg = bgImagesCache.current[activeBackgroundId];
+
+            if (currentBgImg && results.segmentationMask) {
+              // 1. Gambar mask segmentasi orang
+              ctx.drawImage(results.segmentationMask, 0, 0, vWidth, vHeight);
+
+              // 2. 'source-in' memotong gambar kamera sehingga HANYA orang yang tampil
+              // Latar asli ruangan, jendela terang, dan dinding otomatis hilang (100% transparan)!
+              ctx.globalCompositeOperation = 'source-in';
+              ctx.drawImage(results.image, 0, 0, vWidth, vHeight);
+
+              // 3. 'destination-over' menaruh gambar background pilihan di BELAKANG orang
+              ctx.globalCompositeOperation = 'destination-over';
+              drawCoverImage(ctx, currentBgImg, 0, 0, vWidth, vHeight);
+            } else {
+              // Fallback jika gambar background belum siap
+              ctx.drawImage(results.image, 0, 0, vWidth, vHeight);
+            }
+
+            ctx.restore();
+            isProcessing = false;
+          });
+
+          await segmentationManager.send(video);
+        } else if (!isAiActive) {
+          // Render kamera normal jika 'none' dipilih atau AI belum siap
+          ctx.save();
+          ctx.clearRect(0, 0, vWidth, vHeight);
+          if (isMirrored) {
+            ctx.translate(vWidth, 0);
+            ctx.scale(-1, 1);
+          }
+          ctx.drawImage(video, 0, 0, vWidth, vHeight);
+          ctx.restore();
+        }
+      }
+
+      animId = requestAnimationFrame(renderLoop);
+    };
+
+    animId = requestAnimationFrame(renderLoop);
+
+    return () => {
+      if (animId) cancelAnimationFrame(animId);
+    };
+  }, [activeBackgroundId, cameraStatus, isMirrored]);
 
   const handleSwitchCamera = (e) => {
     const newDeviceId = e.target.value;
@@ -128,6 +294,12 @@ export default function CameraPreview({
           </span>
         </div>
         <div className="banner-right">
+          {aiStatus === 'READY' && activeBackgroundId !== 'none' && (
+            <span className="banner-ai-pill" title="AI Background Aktif">
+              <Sparkles size={13} className="text-pink" />
+              <span>AI BG Active</span>
+            </span>
+          )}
           {cameraStatus === 'READY' && (
             <span className="banner-live-pill">
               <span className="pulse-dot" /> LIVE
@@ -143,16 +315,29 @@ export default function CameraPreview({
           aspectRatio: '4 / 3',
           position: 'relative',
           overflow: 'hidden',
-          borderRadius: '0.75rem'
+          borderRadius: '0.75rem',
+          backgroundColor: '#0a0a0f'
         }}
       >
-        {/* Full Live Video Feed — clean camera viewfinder */}
+        {/* Hidden HTML Video element untuk stream mentah kamera */}
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted
-          className={`camera-video-feed ${isMirrored ? 'mirrored' : ''}`}
+          style={{
+            position: 'absolute',
+            width: 1,
+            height: 1,
+            opacity: 0,
+            pointerEvents: 'none'
+          }}
+        />
+
+        {/* Live Canvas Viewfinder — Menampilkan komposit AI secara langsung */}
+        <canvas
+          ref={canvasRef}
+          className="camera-video-feed"
           style={{
             position: 'absolute',
             inset: 0,
@@ -162,7 +347,6 @@ export default function CameraPreview({
             zIndex: 1
           }}
         />
-
 
         {/* Layer 5: Countdown Display */}
         {isCapturing && (
@@ -204,6 +388,64 @@ export default function CameraPreview({
             </div>
           </div>
         )}
+      </div>
+
+      {/* ========================================================
+          PANEL PILIHAN BACKGROUND FOTO (AI VIRTUAL BACKGROUND)
+          Dari folder template/background foto/
+         ======================================================== */}
+      <div className="bg-selector-panel">
+        <div className="bg-selector-header">
+          <div className="bg-selector-title-group">
+            <ImageIcon size={15} className="text-pink" />
+            <span className="bg-selector-title">Ganti Background Foto:</span>
+          </div>
+          <span className="bg-selector-hint">
+            Latar asli &amp; cahaya jendela otomatis diganti dengan AI
+          </span>
+        </div>
+
+        <div className="bg-thumbnails-row">
+          {PHOTO_BACKGROUNDS.map((bg) => {
+            const isSelected = activeBackgroundId === bg.id;
+            return (
+              <button
+                key={bg.id}
+                type="button"
+                className={`bg-thumb-btn ${isSelected ? 'active' : ''}`}
+                onClick={() => {
+                  if (setActiveBackgroundId) {
+                    setActiveBackgroundId(bg.id);
+                  }
+                }}
+                disabled={isCapturing}
+                title={bg.description}
+              >
+                <div className="bg-thumb-preview">
+                  {bg.image ? (
+                    <img
+                      src={bg.image}
+                      alt={bg.name}
+                      className="bg-thumb-img"
+                      crossOrigin="anonymous"
+                    />
+                  ) : (
+                    <div className="bg-thumb-none">
+                      <CameraOff size={16} />
+                    </div>
+                  )}
+
+                  {isSelected && (
+                    <div className="bg-thumb-selected-badge">
+                      <Check size={12} strokeWidth={3} />
+                    </div>
+                  )}
+                </div>
+                <span className="bg-thumb-name">{bg.name}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Camera Toolbar Controls */}

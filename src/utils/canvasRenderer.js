@@ -1,6 +1,6 @@
 /**
  * Utilitas untuk merender gabungan foto kamera multi-slot + overlay frame template ke Canvas
- * Menggunakan Four-Corner Quadrilateral & Perspective Transformation
+ * Mendukung Multi-Shape Slots: rect, roundedRect, polygon, rotation, dan custom radius
  */
 import { drawPerspectivePhoto } from './perspectiveTransform';
 
@@ -24,14 +24,21 @@ export function loadImage(src) {
 
 /**
  * Mengambil snapshot raw dari elemen video kamera
- * @param {HTMLVideoElement} videoEl
+ * @param {HTMLVideoElement|HTMLCanvasElement} videoOrCanvasEl
  * @param {boolean} isMirrored
  * @returns {string} Data URL JPEG resolusi optimal
  */
-export function captureRawVideo(videoEl, isMirrored = true) {
+export function captureRawVideo(videoOrCanvasEl, isMirrored = true) {
+  if (!videoOrCanvasEl) return '';
+
+  // Jika input sudah merupakan HTMLCanvasElement (canvas hasil komposit background AI)
+  if (typeof HTMLCanvasElement !== 'undefined' && videoOrCanvasEl instanceof HTMLCanvasElement) {
+    return videoOrCanvasEl.toDataURL('image/jpeg', 0.95);
+  }
+
   const canvas = document.createElement('canvas');
-  const videoWidth = videoEl.videoWidth || 1280;
-  const videoHeight = videoEl.videoHeight || 720;
+  const videoWidth = videoOrCanvasEl.videoWidth || 1280;
+  const videoHeight = videoOrCanvasEl.videoHeight || 720;
   canvas.width = videoWidth;
   canvas.height = videoHeight;
 
@@ -41,7 +48,7 @@ export function captureRawVideo(videoEl, isMirrored = true) {
     ctx.translate(canvas.width, 0);
     ctx.scale(-1, 1);
   }
-  ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+  ctx.drawImage(videoOrCanvasEl, 0, 0, canvas.width, canvas.height);
   ctx.restore();
 
   return canvas.toDataURL('image/jpeg', 0.95);
@@ -74,7 +81,84 @@ export async function compressImageDataUrl(dataUrl, maxWidth = 1000, quality = 0
 }
 
 /**
- * Mengubah slot lama (x, y, width, height, rotation) menjadi 4-corner points jika points belum ada
+ * Menggambar path rounded rectangle pada canvas context dengan cross-browser fallback
+ * @param {CanvasRenderingContext2D} ctx 
+ * @param {number} x 
+ * @param {number} y 
+ * @param {number} w 
+ * @param {number} h 
+ * @param {number} r 
+ */
+export function drawRoundRectPath(ctx, x, y, w, h, r) {
+  const radius = Math.max(0, Math.min(r || 0, w / 2, h / 2));
+  if (radius === 0) {
+    ctx.rect(x, y, w, h);
+    return;
+  }
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(x, y, w, h, radius);
+  } else {
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + w - radius, y);
+    ctx.arcTo(x + w, y, x + w, y + radius, radius);
+    ctx.lineTo(x + w, y + h - radius);
+    ctx.arcTo(x + w, y + h, x + w - radius, y + h, radius);
+    ctx.lineTo(x + radius, y + h);
+    ctx.arcTo(x, y + h, x, y + h - radius, radius);
+    ctx.lineTo(x, y + radius);
+    ctx.arcTo(x, y, x + radius, y, radius);
+    ctx.closePath();
+  }
+}
+
+/**
+ * Menggambar gambar ke target rectangle dengan strategi object-fit: cover atau contain
+ * @param {CanvasRenderingContext2D} ctx 
+ * @param {HTMLImageElement|HTMLCanvasElement} img 
+ * @param {number} dx 
+ * @param {number} dy 
+ * @param {number} dw 
+ * @param {number} dh 
+ * @param {'cover'|'contain'} fit 
+ */
+export function drawImageWithFit(ctx, img, dx, dy, dw, dh, fit = 'cover') {
+  const imgW = img.naturalWidth || img.width;
+  const imgH = img.naturalHeight || img.height;
+  if (!imgW || !imgH) return;
+
+  const targetAspect = dw / dh;
+  const imgAspect = imgW / imgH;
+
+  let sx = 0, sy = 0, sw = imgW, sh = imgH;
+
+  if (fit === 'cover') {
+    if (imgAspect > targetAspect) {
+      sw = imgH * targetAspect;
+      sx = (imgW - sw) / 2;
+    } else {
+      sh = imgW / targetAspect;
+      sy = (imgH - sh) / 2;
+    }
+    // Sedikit bleed 1px untuk mencegah gap sub-pixel pada batas clipping
+    ctx.drawImage(img, sx, sy, sw, sh, dx - 1, dy - 1, dw + 2, dh + 2);
+  } else {
+    let renderW = dw;
+    let renderH = dh;
+    let renderX = dx;
+    let renderY = dy;
+    if (imgAspect > targetAspect) {
+      renderH = dw / imgAspect;
+      renderY = dy + (dh - renderH) / 2;
+    } else {
+      renderW = dh * imgAspect;
+      renderX = dx + (dw - renderW) / 2;
+    }
+    ctx.drawImage(img, 0, 0, imgW, imgH, renderX, renderY, renderW, renderH);
+  }
+}
+
+/**
+ * Mengubah slot menjadi 4-corner points jika points belum ada
  * @param {Object} slot 
  * @returns {Array<{x: number, y: number}>} [TL, TR, BR, BL]
  */
@@ -118,11 +202,72 @@ export function getSlotPoints(slot) {
 }
 
 /**
+ * Merender foto ke dalam slot dengan bentuk spesifik (rect, roundedRect, polygon)
+ * @param {CanvasRenderingContext2D} ctx 
+ * @param {HTMLImageElement|HTMLCanvasElement} img 
+ * @param {Object} slot 
+ */
+export function renderSlotPhoto(ctx, img, slot) {
+  const points = getSlotPoints(slot);
+  const xs = points.map(p => p.x);
+  const ys = points.map(p => p.y);
+  const minX = slot.x !== undefined ? slot.x : Math.min(...xs);
+  const minY = slot.y !== undefined ? slot.y : Math.min(...ys);
+  const w = slot.width !== undefined ? slot.width : Math.max(...xs) - minX;
+  const h = slot.height !== undefined ? slot.height : Math.max(...ys) - minY;
+  const radius = slot.radius || 0;
+  const rotation = slot.rotation || 0;
+  const fit = slot.fit || 'cover';
+  const shape = slot.shape || (radius > 0 ? 'roundedRect' : (rotation !== 0 ? 'polygon' : 'rect'));
+
+  ctx.save();
+
+  if (shape === 'roundedRect' && radius > 0) {
+    // 1. ROUNDED RECTANGLE SLOT (misalnya template luar angkasa)
+    ctx.beginPath();
+    if (rotation !== 0) {
+      const cx = minX + w / 2;
+      const cy = minY + h / 2;
+      ctx.translate(cx, cy);
+      ctx.rotate((rotation * Math.PI) / 180);
+      drawRoundRectPath(ctx, -w / 2, -h / 2, w, h, radius);
+      ctx.clip();
+      drawImageWithFit(ctx, img, -w / 2, -h / 2, w, h, fit);
+    } else {
+      drawRoundRectPath(ctx, minX, minY, w, h, radius);
+      ctx.clip();
+      drawImageWithFit(ctx, img, minX, minY, w, h, fit);
+    }
+  } else if (shape === 'polygon' && points && points.length >= 4) {
+    // 2. POLYGON / TILTED QUAD SLOT (misalnya template polaroid miring / The 1975)
+    drawPerspectivePhoto(ctx, img, points, { subdivisions: 10 });
+  } else {
+    // 3. STANDARD RECTANGLE SLOT (misalnya template Case File horizontal & vertical)
+    ctx.beginPath();
+    if (rotation !== 0) {
+      const cx = minX + w / 2;
+      const cy = minY + h / 2;
+      ctx.translate(cx, cy);
+      ctx.rotate((rotation * Math.PI) / 180);
+      ctx.rect(-w / 2, -h / 2, w, h);
+      ctx.clip();
+      drawImageWithFit(ctx, img, -w / 2, -h / 2, w, h, fit);
+    } else {
+      ctx.rect(minX, minY, w, h);
+      ctx.clip();
+      drawImageWithFit(ctx, img, minX, minY, w, h, fit);
+    }
+  }
+
+  ctx.restore();
+}
+
+/**
  * Composite Engine Utama Photobox:
  * 1. Base Background Canvas
- * 2. Perspective Render Captured Photos into Each Slot's 4 Corners
- * 3. Mask Frame PNG (punch out slot areas without destroying ornaments)
- * 4. Draw Masked Frame Overlay on top of Photos
+ * 2. Untuk Opaque Frame: Gambar base template lebih dahulu
+ * 3. Gambar semua foto ke slot masing-masing (dengan clipping rect / roundedRect / polygon)
+ * 4. Untuk Transparent Frame / Overlay: Gambar frame template di atas foto
  * 
  * @param {Object|Array|string} photos - Map { [slotId]: dataUrl } atau single photo
  * @param {Object} template - Template object dengan width, height, slots, image
@@ -141,14 +286,27 @@ export async function renderPhotoboxComposite(photos, template, options = {}) {
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
 
-  // 1. LAYER 1: Background canvas
+  // 1. LAYER 1: Background canvas dasar
   ctx.fillStyle = template.backgroundColor || '#ffffff';
   ctx.fillRect(0, 0, targetWidth, targetHeight);
 
-  // 2. LAYER 2: Normalisasi dan Render Setiap Foto ke Slot
+  // 2. LAYER 2: Gambar Base Template (jika bukan transparent overlay frame)
+  // Untuk frame solid/opak, render dekorasi di bawah foto dan foto menutupi placeholder putih
+  const isTransparentFrame = Boolean(template.isTransparentFrame);
+
+  if (template.image && !isTransparentFrame) {
+    try {
+      const baseImg = await loadImage(template.image);
+      ctx.drawImage(baseImg, 0, 0, targetWidth, targetHeight);
+    } catch (e) {
+      console.warn('Gagal memuat template image dasar:', e);
+    }
+  }
+
+  // 3. LAYER 3: Render Setiap Foto ke Slot yang Sesuai
   const slots = template.slots && template.slots.length > 0
     ? template.slots
-    : [{ id: 'slot-1', points: [{ x: 0, y: 0 }, { x: targetWidth, y: 0 }, { x: targetWidth, y: targetHeight }, { x: 0, y: targetHeight }] }];
+    : [{ id: 'slot-1', x: 0, y: 0, width: targetWidth, height: targetHeight, shape: 'rect' }];
 
   const photosMap = {};
   if (typeof photos === 'string') {
@@ -162,61 +320,34 @@ export async function renderPhotoboxComposite(photos, template, options = {}) {
     Object.assign(photosMap, photos);
   }
 
-  // Gambar foto ke setiap slot menggunakan perspective transform
+  // Gambar foto ke setiap slot yang terisi menggunakan renderSlotPhoto
   for (let i = 0; i < slots.length; i++) {
     const slot = slots[i];
-    const photoSrc = photosMap[slot.id] || photosMap[i];
+    const photoSrc = photosMap[slot.id] || photosMap[`slot-${i + 1}`] || photosMap[i];
     if (photoSrc) {
       try {
         const img = await loadImage(photoSrc);
-        const points = getSlotPoints(slot);
-        drawPerspectivePhoto(ctx, img, points, { subdivisions: 10 });
+        renderSlotPhoto(ctx, img, slot);
       } catch (e) {
         console.warn(`Gagal merender slot ${slot.id}:`, e);
       }
     }
   }
 
-  // 3. LAYER 3: Render Masked Frame Overlay
-  if (template.image) {
+  // 4. LAYER 4: Render Frame Overlay di atas foto
+  // Jika frame transparan, template.image adalah bingkai dekoratif yang diletakkan DI ATAS foto
+  // sehingga ornamen, clip, stiker, dan tepi sudut membulat tampil sempurna di atas foto
+  const overlaySrc = template.overlayImage || (isTransparentFrame ? template.image : null);
+  if (overlaySrc) {
     try {
-      const frameImg = await loadImage(template.image);
-      const frameCanvas = document.createElement('canvas');
-      frameCanvas.width = targetWidth;
-      frameCanvas.height = targetHeight;
-      const frameCtx = frameCanvas.getContext('2d');
-      frameCtx.imageSmoothingEnabled = true;
-      frameCtx.imageSmoothingQuality = 'high';
-
-      // Gambar frame asli
-      frameCtx.drawImage(frameImg, 0, 0, targetWidth, targetHeight);
-
-      // Punch out (lubangi) area photo slot pada frame PNG
-      // Gunakan polygon points setiap slot agar area foto terbuka,
-      // tapi seluruh desain, stiker, teks, dan frame ornamen tetap utuh!
-      frameCtx.globalCompositeOperation = 'destination-out';
-      slots.forEach(slot => {
-        const points = getSlotPoints(slot);
-        if (points && points.length >= 4) {
-          frameCtx.beginPath();
-          frameCtx.moveTo(points[0].x, points[0].y);
-          for (let p = 1; p < points.length; p++) {
-            frameCtx.lineTo(points[p].x, points[p].y);
-          }
-          frameCtx.closePath();
-          frameCtx.fill();
-        }
-      });
-
-      // Kembalikan ke mode normal & render frame berlubang ke canvas utama
-      frameCtx.globalCompositeOperation = 'source-over';
-      ctx.drawImage(frameCanvas, 0, 0);
+      const overlayImg = await loadImage(overlaySrc);
+      ctx.drawImage(overlayImg, 0, 0, targetWidth, targetHeight);
     } catch (e) {
-      console.warn('Gagal memproses frame overlay:', e);
+      console.warn('Gagal merender overlay frame:', e);
     }
   }
 
-  // 4. Output Data URL & Blob
+  // 5. Output Data URL & Blob
   const dataUrl = mainCanvas.toDataURL('image/png', 1.0);
   const blob = await new Promise((resolve) => {
     mainCanvas.toBlob((b) => resolve(b), 'image/png', 1.0);

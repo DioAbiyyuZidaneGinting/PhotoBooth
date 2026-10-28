@@ -1,7 +1,16 @@
 import React from 'react';
-import { Camera, Film, LayoutGrid, ArrowRight } from 'lucide-react';
+import { Camera, Film, LayoutGrid, ArrowRight, Heart, Sparkles } from 'lucide-react';
 
 const PHOTO_COUNT_CONFIGS = [
+  {
+    count: 2,
+    label: '2 FOTO',
+    tag: '★ 2 PHOTOS',
+    description: 'Dua foto intim untuk pasangan atau sahabat sejati',
+    icon: Heart,
+    colorScheme: 'rose',
+    slots: 2
+  },
   {
     count: 3,
     label: '3 FOTO',
@@ -19,6 +28,15 @@ const PHOTO_COUNT_CONFIGS = [
     icon: Film,
     colorScheme: 'black',
     slots: 4
+  },
+  {
+    count: 5,
+    label: '5 FOTO',
+    tag: '★ 5 PHOTOS',
+    description: 'Lima foto kolase cerita dinamis & lanskap sinematik',
+    icon: Sparkles,
+    colorScheme: 'blue',
+    slots: 5
   },
   {
     count: 6,

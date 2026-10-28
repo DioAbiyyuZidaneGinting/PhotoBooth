@@ -8,8 +8,10 @@ export default function TemplateGallery({ onSelectTemplate }) {
 
   const tabs = [
     { id: 'ALL', label: 'All Frames', count: TEMPLATES.length },
+    { id: 2, label: '2 Photos', count: TEMPLATES.filter(t => t.photoCount === 2).length },
     { id: 3, label: '3 Photos', count: TEMPLATES.filter(t => t.photoCount === 3).length },
     { id: 4, label: '4 Photos', count: TEMPLATES.filter(t => t.photoCount === 4).length },
+    { id: 5, label: '5 Photos', count: TEMPLATES.filter(t => t.photoCount === 5).length },
     { id: 6, label: '6 Photos', count: TEMPLATES.filter(t => t.photoCount === 6).length },
   ];
 

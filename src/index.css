@@ -1460,7 +1460,8 @@ img, video {
 .live-strip-canvas-box {
   position: relative;
   width: 100%;
-  max-width: 260px;
+  max-width: 320px;
+  max-height: 490px;
   overflow: hidden;
   border-radius: var(--radius-sm);
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
@@ -2508,9 +2509,10 @@ img, video {
 
 .photo-count-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 1.5rem;
   width: 100%;
+  max-width: 1300px;
 }
 
 @media (max-width: 820px) {
@@ -2584,12 +2586,20 @@ img, video {
   gap: 1rem;
 }
 
+.card-theme-rose .count-card-visual-box {
+  background: #FDF2F4;
+}
+
 .card-theme-red .count-card-visual-box {
   background: #FCECE8;
 }
 
 .card-theme-black .count-card-visual-box {
   background: #F1ECE3;
+}
+
+.card-theme-blue .count-card-visual-box {
+  background: #EFF6FF;
 }
 
 .card-theme-yellow .count-card-visual-box {
@@ -2605,8 +2615,16 @@ img, video {
   color: var(--c-ink);
 }
 
+.card-theme-rose .count-card-big-number {
+  color: #E11D48;
+}
+
 .card-theme-red .count-card-big-number {
   color: var(--c-red);
+}
+
+.card-theme-blue .count-card-big-number {
+  color: #2563EB;
 }
 
 .count-card-slots-preview {
@@ -2630,8 +2648,16 @@ img, video {
   border-radius: 2px;
 }
 
+.card-theme-rose .slot-preview-tile {
+  background: rgba(225, 29, 72, 0.35);
+}
+
 .card-theme-red .slot-preview-tile {
   background: rgba(232, 67, 31, 0.35);
+}
+
+.card-theme-blue .slot-preview-tile {
+  background: rgba(37, 99, 235, 0.35);
 }
 
 .card-theme-yellow .slot-preview-tile {
@@ -3267,6 +3293,152 @@ img, video {
 
 .btn-pill.active {
   background: var(--c-yellow) !important;
+}
+
+/* ==========================================================
+   AI BACKGROUND SELECTOR PANEL
+   ========================================================== */
+
+.bg-selector-panel {
+  background: var(--c-cream, #FFFDF8);
+  border: 2px solid var(--c-ink, #111111);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  box-shadow: 3px 3px 0 var(--c-ink, #111111);
+}
+
+.bg-selector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.65rem;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.bg-selector-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.bg-selector-title {
+  font-family: var(--font-display, sans-serif);
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--c-ink, #111111);
+  letter-spacing: -0.01em;
+}
+
+.bg-selector-hint {
+  font-size: 0.72rem;
+  color: var(--c-muted-cream, #666666);
+}
+
+.bg-thumbnails-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.bg-thumb-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.15s ease;
+  min-width: 84px;
+}
+
+.bg-thumb-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.bg-thumb-preview {
+  position: relative;
+  width: 84px;
+  height: 56px;
+  border-radius: 8px;
+  border: 2px solid var(--c-ink, #111111);
+  overflow: hidden;
+  background: #1e1e24;
+  box-shadow: 2px 2px 0 var(--c-ink, #111111);
+  transition: all 0.2s ease;
+}
+
+.bg-thumb-btn.active .bg-thumb-preview {
+  border-color: #EC4899;
+  border-width: 2.5px;
+  box-shadow: 0 0 10px rgba(236, 72, 153, 0.4), 2px 2px 0 #111111;
+}
+
+.bg-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.bg-thumb-none {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #2a2a36;
+  color: #a0aec0;
+}
+
+.bg-thumb-selected-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #EC4899;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #FFFFFF;
+}
+
+.bg-thumb-name {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--c-ink, #111111);
+  text-align: center;
+  max-width: 84px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bg-thumb-btn.active .bg-thumb-name {
+  color: #EC4899;
+  font-weight: 900;
+}
+
+.banner-ai-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  background: rgba(236, 72, 153, 0.15);
+  color: #EC4899;
+  border: 1px solid rgba(236, 72, 153, 0.3);
 }
 
 
